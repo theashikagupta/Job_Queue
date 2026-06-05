@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Agentic Job Assistant",
+  "version": "1.0.0",
+  "description": "Extracts job details and sends them to backend for AI matching.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:9000/*",
+    "http://*/*",
+    "https://*/*",
+    "file:///*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
+      "js": ["contentScript.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Extract Job"
+  }
+}

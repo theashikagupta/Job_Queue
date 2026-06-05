@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agentic Job Assistant</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      body {
+        width: 320px;
+        margin: 0;
+        background: #f7f8fa;
+        color: #17202a;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      h1 {
+        margin: 0 0 14px;
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1.25;
+      }
+
+      button {
+        width: 100%;
+        min-height: 42px;
+        border: 0;
+        border-radius: 6px;
+        background: #176b5d;
+        color: #ffffff;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      button:hover {
+        background: #12584c;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+      }
+
+      #result {
+        min-height: 44px;
+        margin-top: 12px;
+        padding: 10px;
+        border: 1px solid #d7dde4;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #36424f;
+        font-size: 13px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+
+      #result[data-state="success"] {
+        border-color: #6fbf8f;
+        color: #145a32;
+      }
+
+      #result[data-state="error"] {
+        border-color: #d98989;
+        color: #8a1f1f;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Agentic Job Assistant</h1>
+      <button id="extractButton" type="button">Extract Current Job</button>
+      <div id="result" role="status" aria-live="polite">Ready.</div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

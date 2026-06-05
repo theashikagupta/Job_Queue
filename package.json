@@ -1,0 +1,33 @@
+{
+  "name": "job-search-agent",
+  "version": "1.0.0",
+  "description": "Agentic AI job-search assistant backend and helper tools",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "frontend": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node --check authRoutes.js && node --check User.js && node --check middleware/authMiddleware.js && node --check background.js && node --check calculateMatchScore.js && node --check contentScript.js && node --check generateCoverLetter.js && node --check jobAgentTools.js && node --check jobApplications.js && node --check parseResume.js && node --check processJob.js && node --check searchJobs.js && node --check server.js && node --check uploadResumeRoute.js && node --check userPreferences.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@vitejs/plugin-react": "^6.0.2",
+    "axios": "^1.7.9",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.9.5",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "vite": "^8.0.16"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
