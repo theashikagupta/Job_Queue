@@ -172,4 +172,4 @@ Built by [Ashika Gupta](https://github.com/theashikagupta).
 
 ## License
 
-No license file is currently included. Add a license before allowing public reuse, modification, or distribution.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
