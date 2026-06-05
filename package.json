@@ -1,15 +1,16 @@
 {
   "name": "job-search-agent",
   "version": "1.0.0",
-  "description": "Agentic AI job-search assistant backend and helper tools",
-  "main": "server.js",
+  "description": "Job Queue dashboard backend and helper tools",
+  "main": "backend/server.js",
   "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js",
-    "frontend": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "check": "node --check authRoutes.js && node --check User.js && node --check middleware/authMiddleware.js && node --check background.js && node --check calculateMatchScore.js && node --check contentScript.js && node --check generateCoverLetter.js && node --check jobAgentTools.js && node --check jobApplications.js && node --check parseResume.js && node --check processJob.js && node --check searchJobs.js && node --check server.js && node --check uploadResumeRoute.js && node --check userPreferences.js"
+    "dev": "node backend/server.js",
+    "start": "node backend/server.js",
+    "backend": "node backend/server.js",
+    "frontend": "vite frontend",
+    "build": "vite build frontend",
+    "preview": "vite preview frontend",
+    "check": "node --check backend/authRoutes.js && node --check backend/User.js && node --check backend/middleware/authMiddleware.js && node --check backend/calculateMatchScore.js && node --check backend/generateCoverLetter.js && node --check backend/jobAgentTools.js && node --check backend/jobApplications.js && node --check backend/parseResume.js && node --check backend/processJob.js && node --check backend/searchJobs.js && node --check backend/server.js && node --check backend/uploadResumeRoute.js && node --check backend/userPreferences.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -19,7 +20,9 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "framer-motion": "^12.40.0",
     "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^1.17.0",
     "mongoose": "^8.9.5",
     "multer": "^1.4.5-lts.1",
     "pdf-parse": "^1.1.1",

@@ -1,6 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  BriefcaseBusiness,
+  Building2,
+  CalendarClock,
+  ExternalLink,
+  FileUp,
+  Heart,
+  LogOut,
+  MapPin,
+  Moon,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
+  Sun,
+  UploadCloud,
+} from 'lucide-react';
+
+import SiteFooter from './SiteFooter.jsx';
 
 const API_BASE_URL = 'http://localhost:9000';
+const LOGO_SRC = '/assets/job-queue-logo.png';
 const DEFAULT_PREFERENCES = {
   role: '',
   location: '',
@@ -9,6 +30,13 @@ const DEFAULT_PREFERENCES = {
 };
 const VISIBLE_STATUSES = new Set(['queued', 'applied', 'interview', 'offer']);
 const STATUS_OPTIONS = ['queued', 'applied', 'interview', 'rejected', 'offer'];
+const STATUS_LABELS = {
+  queued: 'Queued',
+  applied: 'Applied',
+  interview: 'Interview',
+  rejected: 'Rejected',
+  offer: 'Offer',
+};
 
 function normalizeApplications(payload) {
   if (Array.isArray(payload)) return payload;
@@ -90,7 +118,27 @@ export default function JobQueueDashboard({
     return visibleApplications.filter((application) => application.isFavorite);
   }, [visibleApplications]);
 
+  const dashboardStats = useMemo(() => {
+    const statusCounts = visibleApplications.reduce((counts, application) => {
+      const status = application.status || 'queued';
+      counts[status] = (counts[status] || 0) + 1;
+      return counts;
+    }, {});
+
+    return [
+      { label: 'Queued', value: statusCounts.queued || 0, icon: BriefcaseBusiness },
+      { label: 'Favorites', value: favoriteApplications.length, icon: Star },
+      { label: 'Interviews', value: statusCounts.interview || 0, icon: CalendarClock },
+      { label: 'Offers', value: statusCounts.offer || 0, icon: Sparkles },
+    ];
+  }, [favoriteApplications.length, visibleApplications]);
+
   const displayedApplications = activeView === 'favorites' ? favoriteApplications : visibleApplications;
+  const preferenceChips = [
+    preferences.role && { key: 'role', label: preferences.role, icon: BriefcaseBusiness },
+    preferences.location && { key: 'location', label: preferences.location, icon: MapPin },
+    preferences.jobType && { key: 'jobType', label: preferences.jobType, icon: SlidersHorizontal },
+  ].filter(Boolean);
   const emptyMessage = activeView === 'favorites'
     ? 'No favorite jobs yet. Click the star icon to save jobs here.'
     : 'No queued jobs yet. Upload your resume and save preferences to start.';
@@ -300,27 +348,86 @@ export default function JobQueueDashboard({
 
   if (loading) {
     return (
-      <main className={`app-shell ${theme === 'dark' ? 'dark' : ''}`}>
+      <motion.main
+        className={`app-shell ${theme === 'dark' ? 'dark' : ''}`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
         <section className="job-queue-dashboard">
-          <div className="job-queue-dashboard__state">Loading applications...</div>
+          <motion.div
+            className="job-queue-loader"
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.32, ease: 'easeOut' }}
+          >
+            <div className="job-queue-loader__visual" aria-hidden="true">
+              <motion.div
+                className="job-queue-loader__ring"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
+              />
+              <motion.div
+                className="job-queue-loader__pulse"
+                animate={{ scale: [1, 1.08, 1], opacity: [0.82, 1, 0.82] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                <img src={LOGO_SRC} alt="" />
+              </motion.div>
+            </div>
+            <div className="job-queue-loader__copy">
+              <p>Loading Job Queue</p>
+              <span>Syncing your applications, favorites, and preferences</span>
+            </div>
+            <div className="job-queue-loader__bars" aria-hidden="true">
+              {[0, 1, 2].map((bar) => (
+                <motion.span
+                  key={bar}
+                  animate={{ scaleX: [0.28, 1, 0.28], opacity: [0.45, 1, 0.45] }}
+                  transition={{
+                    duration: 1.1,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                    delay: bar * 0.16,
+                  }}
+                />
+              ))}
+            </div>
+          </motion.div>
         </section>
-      </main>
+      </motion.main>
     );
   }
 
   return (
-    <main className={`app-shell ${theme === 'dark' ? 'dark' : ''}`}>
+    <motion.main
+      className={`app-shell ${theme === 'dark' ? 'dark' : ''}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25 }}
+    >
       <section className="job-queue-dashboard" aria-labelledby="job-queue-heading">
-        <div className="job-queue-dashboard__header">
+        <motion.div
+          className="job-queue-dashboard__header"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28 }}
+        >
           <div>
-            <h1 id="job-queue-heading">Agentic Job Queue</h1>
+            <p className="job-queue-dashboard__eyebrow">
+              <Sparkles size={16} />
+              AI-matched opportunities
+            </p>
+            <div className="job-queue-dashboard__brand">
+              <img src={LOGO_SRC} alt="Job Queue logo" />
+              <h1 id="job-queue-heading">Job Queue</h1>
+            </div>
+            <p className="job-queue-dashboard__subtitle">
+              Track matched roles, favorites, and application progress from one focused dashboard.
+            </p>
           </div>
           <div className="job-queue-dashboard__header-actions">
-            <button
-              className="job-queue-dashboard__button job-queue-dashboard__button--secondary"
-              type="button"
-              onClick={onThemeToggle}
-            >
+            <button className="theme-toggle" type="button" onClick={onThemeToggle}>
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
               {theme === 'dark' ? 'Light' : 'Dark'}
             </button>
             <div className="job-queue-dashboard__user">
@@ -329,24 +436,55 @@ export default function JobQueueDashboard({
                 <span>{user.email}</span>
               </div>
               <button className="job-queue-dashboard__button job-queue-dashboard__button--secondary" type="button" onClick={onLogout}>
+                <LogOut size={17} />
                 Logout
               </button>
             </div>
           </div>
+        </motion.div>
+
+        <div className="job-queue-dashboard__stats">
+          {dashboardStats.map((stat, index) => {
+            const StatIcon = stat.icon;
+
+            return (
+              <motion.div
+                className="job-queue-dashboard__stat"
+                key={stat.label}
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28, delay: 0.05 + index * 0.05 }}
+              >
+                <span>
+                  <StatIcon size={18} />
+                </span>
+                <strong>{stat.value}</strong>
+                <small>{stat.label}</small>
+              </motion.div>
+            );
+          })}
         </div>
 
-        <form className="resume-upload" onSubmit={handleResumeUpload}>
+        <motion.form
+          className="resume-upload"
+          onSubmit={handleResumeUpload}
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.12 }}
+        >
           <div className="resume-upload__header">
             <div>
-              <h2>Upload Resume</h2>
+              <h2><FileUp size={20} /> Upload Resume</h2>
               <p>PDF only. Saved to your account.</p>
             </div>
             <button className="job-queue-dashboard__button" type="submit" disabled={uploadingResume}>
+              <UploadCloud size={17} />
               {uploadingResume ? 'Uploading' : 'Upload Resume'}
             </button>
           </div>
 
           <label className="resume-upload__dropzone">
+            <FileUp size={22} />
             <span>{resumeFile ? resumeFile.name : 'Choose PDF resume'}</span>
             <input
               type="file"
@@ -360,12 +498,18 @@ export default function JobQueueDashboard({
               {resumeStatus}
             </div>
           )}
-        </form>
+        </motion.form>
 
-        <form className="job-preferences" onSubmit={handleSavePreferences}>
+        <motion.form
+          className="job-preferences"
+          onSubmit={handleSavePreferences}
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.18 }}
+        >
           <div className="job-preferences__header">
             <div>
-              <h2>Job Preferences</h2>
+              <h2><SlidersHorizontal size={20} /> Job Preferences</h2>
               <p>Saved to your account.</p>
               <p className="job-preferences__note">Upload your resume first to get accurate AI match scores.</p>
             </div>
@@ -374,6 +518,7 @@ export default function JobQueueDashboard({
               type="submit"
               disabled={savingPreferences || searchingJobs}
             >
+              <Search size={17} />
               {searchingJobs ? 'Searching' : savingPreferences ? 'Saving' : 'Save Preferences'}
             </button>
           </div>
@@ -423,56 +568,108 @@ export default function JobQueueDashboard({
               {preferencesStatus}
             </div>
           )}
-        </form>
+        </motion.form>
 
-        {error && (
-          <div className="job-queue-dashboard__error" role="alert">
-            {error}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              className="job-queue-dashboard__error"
+              role="alert"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.section
+          className="job-board-panel"
+          aria-label="Job vacancies"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.22 }}
+        >
+          <div className="job-board-panel__header">
+            <div>
+              <p className="job-board-panel__eyebrow">
+                <BriefcaseBusiness size={16} />
+                Job Vacancies
+              </p>
+              <h2>{activeView === 'favorites' ? 'Favorite Jobs' : 'Recommended Jobs'}</h2>
+              <p>
+                {displayedApplications.length} active role{displayedApplications.length === 1 ? '' : 's'} matched to your queue.
+              </p>
+            </div>
+            <div className="job-board-panel__chips" aria-label="Current preferences">
+              {preferenceChips.length ? (
+                preferenceChips.map((chip) => {
+                  const ChipIcon = chip.icon;
+
+                  return (
+                    <span key={chip.key}>
+                      <ChipIcon size={15} />
+                      {chip.label}
+                    </span>
+                  );
+                })
+              ) : (
+                <span>
+                  <Sparkles size={15} />
+                  Upload resume and save preferences
+                </span>
+              )}
+            </div>
           </div>
-        )}
 
-        <div className="job-queue-dashboard__filters" role="tablist" aria-label="Job list filters">
-          <button
-            className={`job-queue-dashboard__filter ${activeView === 'all' ? 'job-queue-dashboard__filter--active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={activeView === 'all'}
-            onClick={() => setActiveView('all')}
+          <div
+            className="job-queue-dashboard__filters"
+            role="tablist"
+            aria-label="Job list filters"
           >
-            All Jobs
-            <span>{visibleApplications.length}</span>
-          </button>
-          <button
-            className={`job-queue-dashboard__filter ${activeView === 'favorites' ? 'job-queue-dashboard__filter--active' : ''}`}
-            type="button"
-            role="tab"
-            aria-selected={activeView === 'favorites'}
-            onClick={() => setActiveView('favorites')}
-          >
-            Favorites
-            <span>{favoriteApplications.length}</span>
-          </button>
-        </div>
+            <motion.button
+              className={`job-queue-dashboard__filter ${activeView === 'all' ? 'job-queue-dashboard__filter--active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeView === 'all'}
+              onClick={() => setActiveView('all')}
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <BriefcaseBusiness size={16} />
+              All Jobs
+              <span>{visibleApplications.length}</span>
+            </motion.button>
+            <motion.button
+              className={`job-queue-dashboard__filter ${activeView === 'favorites' ? 'job-queue-dashboard__filter--active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeView === 'favorites'}
+              onClick={() => setActiveView('favorites')}
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <Heart size={16} />
+              Favorites
+              <span>{favoriteApplications.length}</span>
+            </motion.button>
+          </div>
 
-        {!displayedApplications.length ? (
-          <div className="job-queue-dashboard__state">{emptyMessage}</div>
-        ) : (
-          <div className="job-queue-dashboard__table-wrap">
-            <table className="job-queue-dashboard__table">
-              <thead>
-                <tr>
-                  <th>Save</th>
-                  <th>Title</th>
-                  <th>Company</th>
-                  <th>Location</th>
-                  <th>Match Score</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayedApplications.map((application) => {
+          {!displayedApplications.length ? (
+            <motion.div
+              className="job-queue-dashboard__state job-queue-dashboard__state--empty"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.24 }}
+            >
+              <Star size={20} />
+              {emptyMessage}
+            </motion.div>
+          ) : (
+            <div className="job-card-grid">
+              <AnimatePresence mode="popLayout">
+                {displayedApplications.map((application, index) => {
                   const details = getJobDetails(application);
                   const applicationId = getApplicationId(application);
                   const applyUrl = application.jobDetails?.applyUrl;
@@ -480,52 +677,75 @@ export default function JobQueueDashboard({
                   const isTogglingFavorite = togglingFavoriteId === applicationId;
 
                   return (
-                    <tr key={applicationId}>
-                      <td>
-                        <button
+                    <motion.article
+                      className="job-card"
+                      key={applicationId || `${details.applyUrl || details.title || 'job'}-${index}`}
+                      initial={{ opacity: 0, y: 14, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+                      transition={{ duration: 0.24, delay: index * 0.035 }}
+                      whileHover={{ y: -4 }}
+                    >
+                      <div className="job-card__top">
+                        <div className="job-card__company">
+                          <span className="job-card__logo">
+                            <Building2 size={20} />
+                          </span>
+                          <div>
+                            <strong>{details.company || application.company || 'Unknown company'}</strong>
+                            <small>{formatDate(application.createdAt)}</small>
+                          </div>
+                        </div>
+                        <motion.button
                           className={`job-queue-dashboard__favorite ${application.isFavorite ? 'job-queue-dashboard__favorite--active' : ''}`}
                           type="button"
                           aria-label={application.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
                           aria-pressed={Boolean(application.isFavorite)}
                           disabled={!applicationId || isTogglingFavorite}
                           onClick={() => handleToggleFavorite(application)}
+                          whileTap={{ scale: 0.9, rotate: -8 }}
                         >
-                          {application.isFavorite ? '★' : '☆'}
-                        </button>
-                      </td>
-                      <td>
-                        <div className="job-queue-dashboard__title">
-                          {details.title || application.title || 'Untitled role'}
+                          <Star size={19} fill={application.isFavorite ? 'currentColor' : 'none'} />
+                        </motion.button>
+                      </div>
+
+                      <div className="job-card__body">
+                        <div className="job-card__badges">
+                          <span>{details.jobType || application.jobType || 'Full-time'}</span>
+                          {details.source && <span>{details.source}</span>}
                         </div>
-                        {details.source && (
-                          <span className="job-queue-dashboard__source-badge">{details.source}</span>
-                        )}
-                      </td>
-                      <td>{details.company || application.company || 'Unknown company'}</td>
-                      <td className="job-queue-dashboard__muted">
-                        {details.location || application.location || 'Not specified'}
-                      </td>
-                      <td>
-                        <span className="job-queue-dashboard__score">
-                          {application.matchScore ?? details.matchScore ?? 0}%
+                        <h3>{details.title || application.title || 'Untitled role'}</h3>
+                        <p className="job-card__location">
+                          <MapPin size={16} />
+                          {details.location || application.location || 'Not specified'}
+                        </p>
+                      </div>
+
+                      <div className="job-card__meta">
+                        <span>
+                          <Sparkles size={15} />
+                          {application.matchScore ?? details.matchScore ?? 0}% match
                         </span>
-                      </td>
-                      <td>
+                        <span>
+                          <CalendarClock size={15} />
+                          {STATUS_LABELS[currentStatus] || currentStatus}
+                        </span>
+                      </div>
+
+                      <div className="job-card__controls">
                         <select
                           className="job-queue-dashboard__status-select"
                           value={currentStatus}
                           disabled={!applicationId || updatingStatusId === applicationId}
                           onChange={(event) => handleStatusChange(application, event.target.value)}
+                          aria-label={`Update status for ${details.title || application.title || 'job'}`}
                         >
                           {STATUS_OPTIONS.map((status) => (
                             <option key={status} value={status}>
-                              {status}
+                              {STATUS_LABELS[status]}
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td className="job-queue-dashboard__muted">{formatDate(application.createdAt)}</td>
-                      <td>
                         {applyUrl ? (
                           <a
                             className="job-queue-dashboard__button"
@@ -534,19 +754,45 @@ export default function JobQueueDashboard({
                             rel="noopener noreferrer"
                           >
                             Apply Now
+                            <ExternalLink size={16} />
                           </a>
                         ) : (
                           <span className="job-queue-dashboard__muted">No link available</span>
                         )}
-                      </td>
-                    </tr>
+                      </div>
+                    </motion.article>
                   );
                 })}
-              </tbody>
-            </table>
+              </AnimatePresence>
+            </div>
+          )}
+        </motion.section>
+
+        <motion.section
+          className="job-board-cta"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.26 }}
+        >
+          <div>
+            <p className="job-board-panel__eyebrow">
+              <Sparkles size={16} />
+              Next step
+            </p>
+            <h2>Keep your queue moving</h2>
+            <p>Refresh your resume or tune preferences whenever your target role changes.</p>
           </div>
-        )}
+          <button
+            className="job-queue-dashboard__button"
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
+            <Search size={17} />
+            Update Search
+          </button>
+        </motion.section>
       </section>
-    </main>
+      <SiteFooter />
+    </motion.main>
   );
 }

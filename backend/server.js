@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
+const path = require('path');
 const authRoutes = require('./authRoutes');
 const uploadResumeRoute = require('./uploadResumeRoute');
 const calculateMatchScore = require('./calculateMatchScore');
@@ -19,7 +20,8 @@ const {
   preferenceRouter,
 } = require('./userPreferences');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 3000;

@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Moon, Sun } from 'lucide-react';
 import { clearStoredAuth, getStoredAuth, saveAuth } from './auth.js';
 import JobQueueDashboard from './components/JobQueueDashboard.jsx';
 import Login from './components/Login.jsx';
 import Register from './components/Register.jsx';
+import SiteFooter from './components/SiteFooter.jsx';
 
 const THEME_KEY = 'theme';
 
@@ -55,24 +58,41 @@ export default function App() {
   if (!auth) {
     return (
       <main className={`app-shell app-shell--auth ${theme === 'dark' ? 'dark' : ''}`}>
-        {authMode === 'login' ? (
-          <Login
-            message={authMessage}
-            onAuthSuccess={handleAuthSuccess}
-            onSwitchToRegister={() => {
-              setAuthMode('register');
-              setAuthMessage('');
-            }}
-          />
-        ) : (
-          <Register
-            onAuthSuccess={handleAuthSuccess}
-            onSwitchToLogin={() => {
-              setAuthMode('login');
-              setAuthMessage('');
-            }}
-          />
-        )}
+        <button className="theme-toggle theme-toggle--auth" type="button" onClick={handleThemeToggle}>
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          {theme === 'dark' ? 'Light' : 'Dark'}
+        </button>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={authMode}
+            className="auth-motion-wrap"
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -12, scale: 0.98 }}
+            transition={{ duration: 0.26, ease: 'easeOut' }}
+          >
+            {authMode === 'login' ? (
+              <Login
+                message={authMessage}
+                onAuthSuccess={handleAuthSuccess}
+                onSwitchToRegister={() => {
+                  setAuthMode('register');
+                  setAuthMessage('');
+                }}
+              />
+            ) : (
+              <Register
+                onAuthSuccess={handleAuthSuccess}
+                onSwitchToLogin={() => {
+                  setAuthMode('login');
+                  setAuthMessage('');
+                }}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+        <SiteFooter />
       </main>
     );
   }
