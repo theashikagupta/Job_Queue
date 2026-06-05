@@ -20,7 +20,6 @@ Most job seekers waste time opening multiple portals, manually filtering jobs, a
 - Favorites section for saving important jobs
 - Application status tracking with statuses like queued, applied, interview, rejected, and offer
 - Dark mode toggle
-- Optional cover letter generation endpoint using Google Gemini, with a safe fallback letter when Gemini is unavailable
 
 ## Tech stack
 
@@ -33,35 +32,6 @@ Most job seekers waste time opening multiple portals, manually filtering jobs, a
 | Resume parsing | multer, pdf-parse |
 | Job search | JSearch API, Remotive API fallback |
 | AI integration | Google Gemini API |
-
-## Project structure
-
-```txt
-Job_Queue/
-├── src/
-│   ├── App.jsx
-│   ├── App.css
-│   ├── auth.js
-│   └── components/
-│       ├── JobQueueDashboard.jsx
-│       ├── Login.jsx
-│       └── Register.jsx
-├── middleware/
-│   └── authMiddleware.js
-├── authRoutes.js
-├── calculateMatchScore.js
-├── generateCoverLetter.js
-├── jobApplications.js
-├── parseResume.js
-├── processJob.js
-├── searchJobs.js
-├── server.js
-├── uploadResumeRoute.js
-├── userPreferences.js
-├── package.json
-├── README.md
-└── CONTRIBUTORS.md
-```
 
 ## Getting started
 
