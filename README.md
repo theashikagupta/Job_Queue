@@ -20,7 +20,6 @@ Most job seekers waste time opening multiple portals, manually filtering jobs, a
 - Favorites section for saving important jobs
 - Application status tracking with statuses like queued, applied, interview, rejected, and offer
 - Dark mode toggle
-- Optional cover letter generation endpoint using Google Gemini, with a safe fallback letter when Gemini is unavailable
 
 ## Tech stack
 
