@@ -25,7 +25,7 @@ import {
   X,
 } from 'lucide-react';
 
-import API_BASE_URL from '../config/api.js';
+import { apiRequest } from '../config/request.js';
 import SiteFooter from './SiteFooter.jsx';
 
 const DEFAULT_PREFERENCES = {
@@ -135,32 +135,11 @@ function getCompanyInitial(company) {
 }
 
 async function requestJson(url, options = {}, authToken, onSessionExpired) {
-  let response;
-
-  try {
-    response = await fetch(url, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: `Bearer ${authToken}`,
-      },
-    });
-  } catch (error) {
-    throw new Error(`Unable to reach backend at ${API_BASE_URL}. ${error.message}`);
-  }
-
-  const data = await response.json().catch(() => ({}));
-
-  if (response.status === 401) {
-    onSessionExpired();
-    throw new Error('Session expired. Please login again.');
-  }
-
-  if (!response.ok) {
-    throw new Error(data.message || data.error || `Request failed with status ${response.status}`);
-  }
-
-  return data;
+  return apiRequest(url, {
+    ...options,
+    authToken,
+    onSessionExpired,
+  });
 }
 
 export default function JobQueueDashboard({
@@ -258,7 +237,7 @@ export default function JobQueueDashboard({
   }, [activeView, favoriteApplications, jobSearchQuery, sortMode, visibleApplications]);
 
   async function fetchStoredApplications({ replaceSearchResults = false } = {}) {
-    const data = await requestJson(`${API_BASE_URL}/api/applications`, {}, authToken, onSessionExpired);
+    const data = await requestJson('/api/applications', {}, authToken, onSessionExpired);
     const storedApplications = normalizeApplications(data);
 
     setFavoriteJobs(storedApplications.filter((application) => application.isFavorite));
@@ -283,7 +262,7 @@ export default function JobQueueDashboard({
     setSearchResults([]);
     console.log('Searching with preferences:', searchPreferences);
 
-    const searchData = await requestJson(`${API_BASE_URL}/api/jobs/search`, {
+    const searchData = await requestJson('/api/jobs/search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -348,7 +327,7 @@ export default function JobQueueDashboard({
       const formData = new FormData();
       formData.append('resume', resumeFile);
 
-      const data = await requestJson(`${API_BASE_URL}/uploadResume`, {
+      const data = await requestJson('/uploadResume', {
         method: 'POST',
         body: formData,
       }, authToken, onSessionExpired);
@@ -375,8 +354,8 @@ export default function JobQueueDashboard({
         setLoading(true);
         setError('');
         const [applicationsData, preferencesData] = await Promise.all([
-          requestJson(`${API_BASE_URL}/api/applications`, {}, authToken, onSessionExpired),
-          requestJson(`${API_BASE_URL}/api/preferences`, {}, authToken, onSessionExpired),
+          requestJson('/api/applications', {}, authToken, onSessionExpired),
+          requestJson('/api/preferences', {}, authToken, onSessionExpired),
         ]);
 
         if (isMounted) {
@@ -420,7 +399,7 @@ export default function JobQueueDashboard({
       setPreferencesStatus('');
       setPreferencesStatusType('info');
 
-      const data = await requestJson(`${API_BASE_URL}/api/preferences`, {
+      const data = await requestJson('/api/preferences', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -464,7 +443,7 @@ export default function JobQueueDashboard({
       setTogglingFavoriteId(applicationId);
       setError('');
 
-      const data = await requestJson(`${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/favorite`, {
+      const data = await requestJson(`/api/applications/${encodeURIComponent(applicationId)}/favorite`, {
         method: 'PATCH',
       }, authToken, onSessionExpired);
       const updatedApplication = data.application;
@@ -498,7 +477,7 @@ export default function JobQueueDashboard({
       setUpdatingStatusId(applicationId);
       setError('');
 
-      const data = await requestJson(`${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/status`, {
+      const data = await requestJson(`/api/applications/${encodeURIComponent(applicationId)}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

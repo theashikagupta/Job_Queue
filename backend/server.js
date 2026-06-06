@@ -27,21 +27,17 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'resume_parser';
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:3000',
-  'https://jobqueue-production-a8bf.up.railway.app',
-  process.env.FRONTEND_URL,
-].filter(Boolean);
-
-app.use(cors({
-  origin: allowedOrigins,
+const corsOptions = {
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-}));
-app.use(express.json({ limit: '2mb' }));
-app.use('/api/auth', authRoutes);
-app.use(uploadResumeRoute);
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 function getDb() {
   if (!mongoose.connection.db) {
@@ -320,7 +316,7 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     message: 'Backend is healthy',
   });
@@ -332,6 +328,9 @@ app.get('/health', (_req, res) => {
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   });
 });
+
+app.use('/api/auth', authRoutes);
+app.use(uploadResumeRoute);
 
 app.get('/api/queue', async (req, res) => {
   try {
@@ -635,9 +634,15 @@ async function startServer() {
     throw new Error('MONGODB_URI environment variable is required.');
   }
 
-  await mongoose.connect(MONGODB_URI, {
-    dbName: MONGODB_DB_NAME,
-  });
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      dbName: MONGODB_DB_NAME,
+    });
+    console.log('MongoDB connected');
+  } catch (error) {
+    console.error('MongoDB connection failed:', error.message);
+    throw error;
+  }
 
   app.locals.db = getDb();
 
