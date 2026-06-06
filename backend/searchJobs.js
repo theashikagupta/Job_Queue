@@ -77,9 +77,13 @@ function extractSkillsFromText(title, description) {
   });
 }
 
-function buildJSearchQuery(role, location) {
+function buildJSearchQuery(role, location, includeLocation = true) {
   const safeRole = String(role || 'Software Developer').trim();
   const safeLocation = String(location || 'India').trim();
+
+  if (!includeLocation || !safeLocation) {
+    return safeRole;
+  }
 
   return `${safeRole} in ${safeLocation}`;
 }
@@ -144,44 +148,101 @@ function logFirstJSearchJob(job) {
   });
 }
 
+function getApiErrorDetails(error) {
+  return {
+    status: error.response && error.response.status,
+    data: error.response && error.response.data,
+    message: error.message,
+  };
+}
+
+async function requestJSearchJobs(query) {
+  console.log('Final query sent to JSearch:', query);
+
+  try {
+    const response = await axios.get('https://jsearch.p.rapidapi.com/search', {
+      params: {
+        query,
+        page: 1,
+        num_pages: 1,
+        country: 'in',
+        date_posted: 'month',
+      },
+      headers: {
+        'X-RapidAPI-Key': process.env.JSEARCH_API_KEY,
+        'X-RapidAPI-Host': process.env.JSEARCH_API_HOST || DEFAULT_JSEARCH_HOST,
+      },
+    });
+
+    if (!response.data || !Array.isArray(response.data.data)) {
+      throw new Error('JSearch API returned an unexpected response format.');
+    }
+
+    console.log('Raw jobs count from JSearch:', response.data.data.length);
+    return response.data.data;
+  } catch (error) {
+    console.error('JSearch API error response:', getApiErrorDetails(error));
+    throw error;
+  }
+}
+
+function normalizeJSearchJobs(rawJobs, preferences) {
+  return rawJobs
+    .map((job) => normalizeJSearchJob(job, preferences))
+    .filter(Boolean);
+}
+
 async function fetchJSearchJobs(preferences) {
   if (!process.env.JSEARCH_API_KEY) {
     return {
       jobs: [],
       skipped: true,
       reason: 'JSEARCH_API_KEY is missing.',
+      finalQuery: '',
+      rawCount: 0,
     };
   }
 
-  const response = await axios.get('https://jsearch.p.rapidapi.com/search', {
-    params: {
-      query: buildJSearchQuery(preferences.role, preferences.location),
-      page: 1,
-      num_pages: 1,
-      country: 'in',
-      date_posted: 'month',
-    },
-    headers: {
-      'X-RapidAPI-Key': process.env.JSEARCH_API_KEY,
-      'X-RapidAPI-Host': process.env.JSEARCH_API_HOST || DEFAULT_JSEARCH_HOST,
-    },
-  });
+  const roleLocationQuery = buildJSearchQuery(preferences.role, preferences.location, true);
+  const roleOnlyQuery = buildJSearchQuery(preferences.role, '', false);
+  const queries = roleLocationQuery === roleOnlyQuery
+    ? [roleLocationQuery]
+    : [roleLocationQuery, roleOnlyQuery];
 
-  if (!response.data || !Array.isArray(response.data.data)) {
-    throw new Error('JSearch API returned an unexpected response format.');
+  let finalQuery = '';
+  let rawCount = 0;
+
+  for (const query of queries) {
+    finalQuery = query;
+    const rawJobs = await requestJSearchJobs(query);
+    rawCount = rawJobs.length;
+    const jobs = normalizeJSearchJobs(rawJobs, preferences);
+
+    console.log('Normalized usable JSearch jobs count:', jobs.length);
+
+    if (jobs.length) {
+      logFirstJSearchJob(jobs[0]);
+
+      return {
+        jobs,
+        skipped: false,
+        reason: '',
+        finalQuery,
+        rawCount,
+      };
+    }
+
+    if (query !== queries[queries.length - 1]) {
+      console.log('JSearch returned no usable jobs; retrying with role only.');
+    }
   }
 
-  const jobs = response.data.data
-    .map((job) => normalizeJSearchJob(job, preferences))
-    .filter(Boolean)
-    .filter((job) => matchesJobType(job.jobType, preferences.jobType));
-
-  logFirstJSearchJob(jobs[0]);
-
   return {
-    jobs,
+    jobs: [],
     skipped: false,
     reason: '',
+    finalQuery,
+    rawCount,
   };
 }
 
@@ -198,16 +259,19 @@ async function fetchRemotiveJobs(preferences) {
 
   return response.data.jobs
     .map((job) => normalizeRemotiveJob(job, preferences))
-    .filter(Boolean)
-    .filter((job) => matchesJobType(job.jobType, preferences.jobType));
+    .filter(Boolean);
 }
 
 async function searchJobs(preferences = {}) {
   let fallbackUsed = false;
   let fallbackReason = '';
+  let finalQuery = '';
+  let jSearchRawCount = 0;
 
   try {
     const jSearchResult = await fetchJSearchJobs(preferences);
+    finalQuery = jSearchResult.finalQuery || '';
+    jSearchRawCount = jSearchResult.rawCount || 0;
 
     if (jSearchResult.jobs.length) {
       return {
@@ -216,6 +280,9 @@ async function searchJobs(preferences = {}) {
         fallbackUsed: false,
         fallbackReason: '',
         fetchedCount: jSearchResult.jobs.length,
+        finalQuery: jSearchResult.finalQuery,
+        rawCount: jSearchResult.rawCount,
+        jSearchRawCount,
       };
     }
 
@@ -226,10 +293,12 @@ async function searchJobs(preferences = {}) {
     fallbackReason = error.response
       ? `JSearch API error ${error.response.status}.`
       : error.message;
+    console.error('JSearch API error response:', getApiErrorDetails(error));
     console.warn('JSearch unavailable; falling back to Remotive:', fallbackReason);
   }
 
   const remotiveJobs = await fetchRemotiveJobs(preferences);
+  console.log('Remotive fallback jobs count:', remotiveJobs.length);
 
   return {
     jobs: remotiveJobs,
@@ -237,6 +306,9 @@ async function searchJobs(preferences = {}) {
     fallbackUsed,
     fallbackReason,
     fetchedCount: remotiveJobs.length,
+    finalQuery: finalQuery || preferences.role || '',
+    rawCount: remotiveJobs.length,
+    jSearchRawCount,
   };
 }
 

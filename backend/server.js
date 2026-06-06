@@ -196,6 +196,65 @@ function preferenceValue(preferences, field, legacyField) {
   return '';
 }
 
+function requestPreferenceValue(body, field) {
+  if (!body || !Object.prototype.hasOwnProperty.call(body, field)) {
+    return '';
+  }
+
+  const value = body[field];
+
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return String(value).trim();
+}
+
+function searchPreferenceValue(preferences, body, field, legacyField) {
+  return requestPreferenceValue(body, field) || preferenceValue(preferences, field, legacyField);
+}
+
+function searchMinMatchScore(preferences, body) {
+  const rawScore = body && (body.minimumScore ?? body.minMatchScore);
+  const score = rawScore === undefined || rawScore === null || rawScore === ''
+    ? Number(preferences.minMatchScore ?? 70)
+    : Number(rawScore);
+
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 70;
+}
+
+function hasResumeSkills(resumeData) {
+  return Array.isArray(resumeData && resumeData.skills) && resumeData.skills.length > 0;
+}
+
+function getFallbackMatchScore(minMatchScore) {
+  return Math.max(50, Math.min(100, Number(minMatchScore) || 70));
+}
+
+function calculateSearchMatchScore(resumeData, job, minMatchScore) {
+  try {
+    const score = calculateMatchScore(resumeData, job);
+
+    if (!Number.isFinite(score)) {
+      throw new Error('Match score is not a finite number.');
+    }
+
+    if (!hasResumeSkills(resumeData) && score < minMatchScore) {
+      return {
+        score: getFallbackMatchScore(minMatchScore),
+        warning: 'Resume skills missing; using fallback match score.',
+      };
+    }
+
+    return { score };
+  } catch (error) {
+    return {
+      score: getFallbackMatchScore(minMatchScore),
+      warning: `Match score calculation failed; using fallback match score. ${error.message}`,
+    };
+  }
+}
+
 function jobMatchesPreferences(job, preferences) {
   const role = normalizeSearchTerm(preferenceValue(preferences, 'role', 'preferredRoles'));
   const location = normalizeSearchTerm(preferenceValue(preferences, 'location', 'preferredLocations'));
@@ -316,6 +375,12 @@ app.post('/api/jobs/process', async (req, res) => {
 app.post('/api/jobs/search', protect, async (req, res) => {
   try {
     const userId = req.user._id.toString();
+    console.log('POST /api/jobs/search request body:', {
+      role: req.body && req.body.role,
+      location: req.body && req.body.location,
+      jobType: req.body && req.body.jobType,
+      minMatchScore: req.body && (req.body.minimumScore ?? req.body.minMatchScore),
+    });
 
     const resumeData = await findLatestResumeData(userId);
 
@@ -324,22 +389,55 @@ app.post('/api/jobs/search', protect, async (req, res) => {
     }
 
     const preferences = await getPreferences(userId);
-    const minMatchScore = Number(preferences.minMatchScore ?? 70);
-    const role = preferenceValue(preferences, 'role', 'preferredRoles');
-    const location = preferenceValue(preferences, 'location', 'preferredLocations');
-    const jobType = preferenceValue(preferences, 'jobType', 'preferredJobType');
-    const searchResult = await searchJobs({
+    const minMatchScore = searchMinMatchScore(preferences, req.body || {});
+    const role = searchPreferenceValue(preferences, req.body || {}, 'role', 'preferredRoles');
+    const location = searchPreferenceValue(preferences, req.body || {}, 'location', 'preferredLocations');
+    const jobType = searchPreferenceValue(preferences, req.body || {}, 'jobType', 'preferredJobType');
+    const searchPreferences = {
       role,
       location,
       jobType,
-    });
+      minMatchScore,
+    };
+    console.log('Resolved job search preferences:', searchPreferences);
+
+    const searchResult = await searchJobs(searchPreferences);
+    console.log('Final query sent to JSearch:', searchResult.finalQuery || `${role} in ${location}`.trim());
+    console.log('Raw jobs count from JSearch:', searchResult.jSearchRawCount ?? searchResult.rawCount ?? 0);
     const candidateJobs = searchResult.jobs;
     const savedJobs = [];
     let queuedCount = 0;
     let rejectedCount = 0;
+    const scoreWarnings = new Set();
+
+    if (!candidateJobs.length) {
+      console.log('Queued jobs count:', queuedCount);
+      console.log('Rejected jobs count:', rejectedCount);
+
+      return res.json({
+        success: true,
+        primarySource: searchResult.primarySource,
+        fallbackUsed: searchResult.fallbackUsed,
+        fetchedCount: 0,
+        queuedCount,
+        rejectedCount,
+        applications: [],
+        message: 'No jobs found for these preferences. Try a broader role or location.',
+        queued: queuedCount,
+        rejected: rejectedCount,
+        totalFound: 0,
+        source: searchResult.fallbackUsed ? 'Remotive' : 'JSearch',
+        jobs: [],
+      });
+    }
 
     for (const job of candidateJobs) {
-      const matchScore = calculateMatchScore(resumeData, job);
+      const scoreResult = calculateSearchMatchScore(resumeData, job, minMatchScore);
+      const matchScore = scoreResult.score;
+      if (scoreResult.warning) {
+        scoreWarnings.add(scoreResult.warning);
+      }
+
       const status = matchScore >= minMatchScore ? 'queued' : 'rejected';
       const savedJob = await upsertJobApplicationByApplyUrl(
         userId,
@@ -360,6 +458,13 @@ app.post('/api/jobs/search', protect, async (req, res) => {
       savedJobs.push(savedJob);
     }
 
+    if (scoreWarnings.size) {
+      console.warn('Job search scoring warnings:', [...scoreWarnings]);
+    }
+
+    console.log('Queued jobs count:', queuedCount);
+    console.log('Rejected jobs count:', rejectedCount);
+
     const applications = savedJobs.map(formatApplicationResponse);
 
     return res.json({
@@ -375,10 +480,20 @@ app.post('/api/jobs/search', protect, async (req, res) => {
       rejected: rejectedCount,
       totalFound: candidateJobs.length,
       source: searchResult.fallbackUsed ? 'Remotive' : 'JSearch',
+      warnings: [...scoreWarnings],
       jobs: applications,
     });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to search jobs.', error: error.message });
+    console.error('Job search API/backend error:', {
+      message: error.message,
+      status: error.response && error.response.status,
+      data: error.response && error.response.data,
+    });
+
+    return res.status(500).json({
+      message: 'Job search failed. Please check API key or backend logs.',
+      error: error.message,
+    });
   }
 });
 
