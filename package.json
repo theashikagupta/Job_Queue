@@ -4,8 +4,8 @@
   "description": "Job Queue dashboard backend and helper tools",
   "main": "backend/server.js",
   "scripts": {
-    "dev": "node backend/server.js",
-    "start": "node backend/server.js",
+    "dev": "nodemon server.js",
+    "start": "node server.js",
     "backend": "node backend/server.js",
     "frontend": "vite frontend",
     "build": "vite build frontend",
