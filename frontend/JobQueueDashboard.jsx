@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
+import API_BASE_URL from './src/config/api.js';
+
 function getJobId(job) {
   return job._id || job.id || job.jobId || (job.jobDetails && (job.jobDetails._id || job.jobDetails.id));
 }
@@ -16,7 +18,15 @@ function normalizeJobs(payload) {
 }
 
 async function requestJson(url, options) {
-  const response = await fetch(url, options);
+  const requestUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url}`;
+  let response;
+
+  try {
+    response = await fetch(requestUrl, options);
+  } catch (error) {
+    throw new Error(`Unable to reach backend at ${API_BASE_URL}. ${error.message}`);
+  }
+
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {

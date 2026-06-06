@@ -25,9 +25,9 @@ import {
   X,
 } from 'lucide-react';
 
+import API_BASE_URL from '../config/api.js';
 import SiteFooter from './SiteFooter.jsx';
 
-const API_BASE_URL = 'http://localhost:9000';
 const DEFAULT_PREFERENCES = {
   role: '',
   location: '',
@@ -91,13 +91,20 @@ function getCompanyInitial(company) {
 }
 
 async function requestJson(url, options = {}, authToken, onSessionExpired) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${authToken}`,
-    },
-  });
+  let response;
+
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${authToken}`,
+      },
+    });
+  } catch (error) {
+    throw new Error(`Unable to reach backend at ${API_BASE_URL}. ${error.message}`);
+  }
+
   const data = await response.json().catch(() => ({}));
 
   if (response.status === 401) {

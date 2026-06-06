@@ -2,16 +2,23 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, BriefcaseBusiness, Lock, Mail, ShieldCheck, Sparkles, User } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:9000';
+import API_BASE_URL from '../config/api.js';
 
 async function requestAuth(path, payload) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    throw new Error(`Unable to reach backend at ${API_BASE_URL}. ${error.message}`);
+  }
+
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {

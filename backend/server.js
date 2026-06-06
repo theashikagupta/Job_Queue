@@ -24,11 +24,21 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const app = express();
-const PORT = process.env.PORT || 9000;
+const PORT = process.env.PORT || 8080;
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'resume_parser';
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  'https://jobqueue-production-a8bf.up.railway.app',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
 
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
 app.use(express.json({ limit: '2mb' }));
 app.use('/api/auth', authRoutes);
 app.use(uploadResumeRoute);
@@ -304,6 +314,17 @@ async function findApplicationForAction(identifier, userId) {
 
   return JobApplication.findOne({ $or: lookup }).lean();
 }
+
+app.get('/', (_req, res) => {
+  res.send('Job Queue backend is running');
+});
+
+app.get('/api/health', (_req, res) => {
+  res.json({
+    success: true,
+    message: 'Backend is healthy',
+  });
+});
 
 app.get('/health', (_req, res) => {
   res.json({
@@ -620,8 +641,8 @@ async function startServer() {
 
   app.locals.db = getDb();
 
-  app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
