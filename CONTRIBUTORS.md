@@ -14,7 +14,7 @@ Add your name here after your first accepted contribution.
 
 | Name | GitHub | Contribution |
 | --- | --- | --- |
-| Ashika Gupta | [@theashikagupta](https://github.com/theashikagupta) | Full-stack development, project idea, authentication, dashboard, resume parsing, job queue workflow |
+| Ashika Gupta | [@theashikagupta](https://github.com/theashikagupta) | Full-stack development, project idea, authentication, dashboard, resume parsing, job search, and application tracking workflow |
 
 ## Contribution guidelines
 

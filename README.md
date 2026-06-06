@@ -25,13 +25,45 @@ Most job seekers waste time opening multiple portals, manually filtering jobs, a
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | React, Vite, CSS |
+| Frontend | React, Vite, CSS, Framer Motion, Lucide React |
 | Backend | Node.js, Express.js |
 | Database | MongoDB, Mongoose |
 | Authentication | JWT, bcryptjs |
 | Resume parsing | multer, pdf-parse |
 | Job search | JSearch API, Remotive API fallback |
 | AI integration | Google Gemini API |
+
+## Project structure
+
+```txt
+Job_Queue/
+|-- backend/
+|   |-- middleware/
+|   |   `-- authMiddleware.js
+|   |-- authRoutes.js
+|   |-- calculateMatchScore.js
+|   |-- generateCoverLetter.js
+|   |-- jobApplications.js
+|   |-- parseResume.js
+|   |-- processJob.js
+|   |-- searchJobs.js
+|   |-- server.js
+|   |-- uploadResumeRoute.js
+|   `-- userPreferences.js
+|-- frontend/
+|   |-- public/
+|   |   `-- assets/
+|   |-- src/
+|   |   |-- App.jsx
+|   |   |-- App.css
+|   |   |-- auth.js
+|   |   `-- components/
+|   `-- index.html
+|-- package.json
+|-- README.md
+|-- CONTRIBUTORS.md
+`-- LICENSE
+```
 
 ## Getting started
 
@@ -50,7 +82,7 @@ npm install
 
 ### 3. Create environment variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the project root or inside the `backend/` folder:
 
 ```env
 PORT=9000
@@ -143,15 +175,15 @@ The score is rule-based and explainable. It can later be upgraded with embedding
 ```bash
 npm run dev       # Start backend server
 npm run start     # Start backend server
+npm run backend   # Start backend server
 npm run frontend  # Start Vite frontend
 npm run build     # Build frontend
 npm run preview   # Preview production frontend build
-npm run check     # Syntax-check backend and extension/helper files
+npm run check     # Syntax-check backend/helper files
 ```
 
 ## Roadmap
 
-- Browser extension for extracting jobs from the current webpage
 - Smarter resume-job matching with embeddings
 - Better dashboard analytics
 - Interview reminder workflow
