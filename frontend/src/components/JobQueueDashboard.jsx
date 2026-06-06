@@ -47,6 +47,7 @@ const STATUS_LABELS = {
 function normalizeApplications(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload.applications)) return payload.applications;
+  if (Array.isArray(payload.jobs)) return payload.jobs;
   return [];
 }
 
@@ -56,6 +57,49 @@ function getApplicationId(application) {
 
 function getJobDetails(application) {
   return application.jobDetails || {};
+}
+
+function getApplicationKey(application) {
+  const details = getJobDetails(application);
+
+  return getApplicationId(application)
+    || details.applyUrl
+    || application.applyUrl
+    || [
+      details.title || application.title || '',
+      details.company || application.company || '',
+      details.location || application.location || '',
+    ].join('-');
+}
+
+function isVisibleApplication(application) {
+  return VISIBLE_STATUSES.has(application.status || 'queued');
+}
+
+function mergeApplications(currentApplications, incomingApplications) {
+  const merged = new Map();
+
+  [...currentApplications, ...incomingApplications].filter(Boolean).forEach((application) => {
+    const key = getApplicationKey(application);
+
+    if (key) {
+      merged.set(key, application);
+    }
+  });
+
+  return Array.from(merged.values());
+}
+
+function updateApplicationList(currentApplications, updatedApplication) {
+  const updatedKey = getApplicationKey(updatedApplication);
+
+  if (!updatedKey) {
+    return currentApplications;
+  }
+
+  return currentApplications.map((application) => (
+    getApplicationKey(application) === updatedKey ? updatedApplication : application
+  ));
 }
 
 function getMatchScore(application) {
@@ -130,7 +174,8 @@ export default function JobQueueDashboard({
   const isDarkMode = theme === 'dark';
   const logoSrc = isDarkMode ? '/assets/logo-dm.png' : '/assets/logo-lm.png';
   const userFirstName = user?.name?.split(' ')[0] || 'Ashika';
-  const [applications, setApplications] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [favoriteJobs, setFavoriteJobs] = useState([]);
   const [resumeFile, setResumeFile] = useState(null);
   const [resumeStatus, setResumeStatus] = useState('');
   const [resumeStatusType, setResumeStatusType] = useState('info');
@@ -152,12 +197,12 @@ export default function JobQueueDashboard({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const visibleApplications = useMemo(() => {
-    return applications.filter((application) => VISIBLE_STATUSES.has(application.status || 'queued'));
-  }, [applications]);
+    return searchResults.filter(isVisibleApplication);
+  }, [searchResults]);
 
   const favoriteApplications = useMemo(() => {
-    return visibleApplications.filter((application) => application.isFavorite);
-  }, [visibleApplications]);
+    return favoriteJobs.filter((application) => application.isFavorite && isVisibleApplication(application));
+  }, [favoriteJobs]);
 
   const dashboardStats = useMemo(() => {
     const statusCounts = visibleApplications.reduce((counts, application) => {
@@ -180,8 +225,8 @@ export default function JobQueueDashboard({
 
   const displayedApplications = useMemo(() => {
     const query = jobSearchQuery.trim().toLowerCase();
-    const filteredByTab = visibleApplications.filter((application) => {
-      if (activeView === 'favorites') return application.isFavorite;
+    const tabSource = activeView === 'favorites' ? favoriteApplications : visibleApplications;
+    const filteredByTab = tabSource.filter((application) => {
       if (activeView === 'applied') return application.status === 'applied';
       if (activeView === 'interviews') return application.status === 'interview';
       return true;
@@ -210,11 +255,17 @@ export default function JobQueueDashboard({
       }
       return getMatchScore(second) - getMatchScore(first);
     });
-  }, [activeView, jobSearchQuery, sortMode, visibleApplications]);
+  }, [activeView, favoriteApplications, jobSearchQuery, sortMode, visibleApplications]);
 
-  async function fetchApplications() {
+  async function fetchStoredApplications({ replaceSearchResults = false } = {}) {
     const data = await requestJson(`${API_BASE_URL}/api/applications`, {}, authToken, onSessionExpired);
-    setApplications(normalizeApplications(data));
+    const storedApplications = normalizeApplications(data);
+
+    setFavoriteJobs(storedApplications.filter((application) => application.isFavorite));
+
+    if (replaceSearchResults) {
+      setSearchResults(storedApplications);
+    }
   }
 
   function updatePreferenceField(field, value) {
@@ -228,6 +279,8 @@ export default function JobQueueDashboard({
     setSearchingJobs(true);
     setPreferencesStatus('Searching jobs with your latest profile...');
     setPreferencesStatusType('info');
+    setActiveView('all');
+    setSearchResults([]);
     console.log('Searching with preferences:', searchPreferences);
 
     const searchData = await requestJson(`${API_BASE_URL}/api/jobs/search`, {
@@ -245,11 +298,7 @@ export default function JobQueueDashboard({
     }, authToken, onSessionExpired);
 
     const returnedApplications = normalizeApplications(searchData);
-    if (returnedApplications.length) {
-      setApplications(returnedApplications);
-    }
-
-    await fetchApplications();
+    setSearchResults(returnedApplications);
 
     const queued = Number(searchData.queued || searchData.queuedCount || 0);
     const rejected = Number(searchData.rejected || searchData.rejectedCount || 0);
@@ -331,7 +380,9 @@ export default function JobQueueDashboard({
         ]);
 
         if (isMounted) {
-          setApplications(normalizeApplications(applicationsData));
+          const storedApplications = normalizeApplications(applicationsData);
+          setSearchResults(storedApplications);
+          setFavoriteJobs(storedApplications.filter((application) => application.isFavorite));
           setPreferences({
             ...DEFAULT_PREFERENCES,
             ...(preferencesData.preferences || {}),
@@ -419,13 +470,14 @@ export default function JobQueueDashboard({
       const updatedApplication = data.application;
 
       if (updatedApplication) {
-        setApplications((currentApplications) => currentApplications.map((currentApplication) => (
-          getApplicationId(currentApplication) === getApplicationId(updatedApplication)
-            ? updatedApplication
-            : currentApplication
-        )));
+        setSearchResults((currentResults) => updateApplicationList(currentResults, updatedApplication));
+        setFavoriteJobs((currentFavorites) => (
+          updatedApplication.isFavorite
+            ? mergeApplications(currentFavorites, [updatedApplication])
+            : currentFavorites.filter((favoriteJob) => getApplicationKey(favoriteJob) !== getApplicationKey(updatedApplication))
+        ));
       } else {
-        await fetchApplications();
+        await fetchStoredApplications();
       }
     } catch (favoriteError) {
       setError(favoriteError.message);
@@ -446,7 +498,7 @@ export default function JobQueueDashboard({
       setUpdatingStatusId(applicationId);
       setError('');
 
-      await requestJson(`${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/status`, {
+      const data = await requestJson(`${API_BASE_URL}/api/applications/${encodeURIComponent(applicationId)}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -456,7 +508,14 @@ export default function JobQueueDashboard({
         }),
       }, authToken, onSessionExpired);
 
-      await fetchApplications();
+      const updatedApplication = data.application || data;
+
+      if (getApplicationId(updatedApplication)) {
+        setSearchResults((currentResults) => updateApplicationList(currentResults, updatedApplication));
+        setFavoriteJobs((currentFavorites) => updateApplicationList(currentFavorites, updatedApplication));
+      } else {
+        await fetchStoredApplications();
+      }
     } catch (statusError) {
       setError(statusError.message);
     } finally {
