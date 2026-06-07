@@ -153,8 +153,11 @@ export default function JobQueueDashboard({
   const isDarkMode = theme === 'dark';
   const logoSrc = isDarkMode ? '/assets/logo-dm.png' : '/assets/logo-lm.png';
   const userFirstName = user?.name?.split(' ')[0] || 'Ashika';
-  const [searchResults, setSearchResults] = useState([]);
+  // Separate state for each tab/collection
+  const [allJobs, setAllJobs] = useState([]);
   const [favoriteJobs, setFavoriteJobs] = useState([]);
+  const [appliedJobs, setAppliedJobs] = useState([]);
+  const [interviewJobs, setInterviewJobs] = useState([]);
   const [resumeFile, setResumeFile] = useState(null);
   const [resumeStatus, setResumeStatus] = useState('');
   const [resumeStatusType, setResumeStatusType] = useState('info');
@@ -176,42 +179,32 @@ export default function JobQueueDashboard({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const visibleApplications = useMemo(() => {
-    return searchResults.filter(isVisibleApplication);
-  }, [searchResults]);
+    return allJobs.filter(isVisibleApplication);
+  }, [allJobs]);
 
   const favoriteApplications = useMemo(() => {
     return favoriteJobs.filter((application) => application.isFavorite && isVisibleApplication(application));
   }, [favoriteJobs]);
 
-  const dashboardStats = useMemo(() => {
-    const statusCounts = visibleApplications.reduce((counts, application) => {
-      const status = application.status || 'queued';
-      counts[status] = (counts[status] || 0) + 1;
-      return counts;
-    }, {});
-    const averageMatch = visibleApplications.length
-      ? Math.round(visibleApplications.reduce((total, application) => total + getMatchScore(application), 0) / visibleApplications.length)
-      : 0;
-
-    return [
-      { label: 'Queued Jobs', value: statusCounts.queued || 0, icon: BriefcaseBusiness, tone: 'accent' },
-      { label: 'Favorites', value: favoriteApplications.length, icon: Star, tone: 'warning' },
-      { label: 'Applied', value: statusCounts.applied || 0, icon: CheckCircle2, tone: 'blue' },
-      { label: 'Interviews', value: statusCounts.interview || 0, icon: CalendarClock, tone: 'purple' },
-      { label: 'Average Match Score', value: `${averageMatch}%`, icon: Sparkles, tone: 'success' },
-    ];
-  }, [favoriteApplications.length, visibleApplications]);
-
   const displayedApplications = useMemo(() => {
     const query = jobSearchQuery.trim().toLowerCase();
-    const tabSource = activeView === 'favorites' ? favoriteApplications : visibleApplications;
-    const filteredByTab = tabSource.filter((application) => {
-      if (activeView === 'applied') return application.status === 'applied';
-      if (activeView === 'interviews') return application.status === 'interview';
-      return true;
-    });
+    
+    // Get the correct source array based on active tab
+    let tabSource;
+    if (activeView === 'favorites') {
+      tabSource = favoriteApplications;
+    } else if (activeView === 'applied') {
+      tabSource = appliedJobs;
+    } else if (activeView === 'interviews') {
+      tabSource = interviewJobs;
+    } else {
+      // 'all' view shows all jobs from search results
+      tabSource = visibleApplications;
+    }
+
+    // Filter by search query
     const searched = query
-      ? filteredByTab.filter((application) => {
+      ? tabSource.filter((application) => {
         const details = getJobDetails(application);
         const haystack = [
           details.title,
@@ -223,8 +216,9 @@ export default function JobQueueDashboard({
         ].join(' ').toLowerCase();
         return haystack.includes(query);
       })
-      : filteredByTab;
+      : tabSource;
 
+    // Sort results
     return [...searched].sort((first, second) => {
       if (sortMode === 'latest') {
         return new Date(second.createdAt || 0).getTime() - new Date(first.createdAt || 0).getTime();
@@ -234,16 +228,24 @@ export default function JobQueueDashboard({
       }
       return getMatchScore(second) - getMatchScore(first);
     });
-  }, [activeView, favoriteApplications, jobSearchQuery, sortMode, visibleApplications]);
+  }, [activeView, appliedJobs, favoriteApplications, interviewJobs, jobSearchQuery, sortMode, visibleApplications]);
 
-  async function fetchStoredApplications({ replaceSearchResults = false } = {}) {
+  async function fetchStoredApplications({ replaceAllJobs = false } = {}) {
     const data = await requestJson('/api/applications', {}, authToken, onSessionExpired);
     const storedApplications = normalizeApplications(data);
 
-    setFavoriteJobs(storedApplications.filter((application) => application.isFavorite));
+    // Extract jobs by category
+    const favorites = storedApplications.filter((application) => application.isFavorite);
+    const applied = storedApplications.filter((application) => application.status === 'applied');
+    const interviews = storedApplications.filter((application) => application.status === 'interview');
 
-    if (replaceSearchResults) {
-      setSearchResults(storedApplications);
+    setFavoriteJobs(favorites);
+    setAppliedJobs(applied);
+    setInterviewJobs(interviews);
+
+    // Only replace allJobs if explicitly requested
+    if (replaceAllJobs) {
+      setAllJobs(storedApplications);
     }
   }
 
@@ -259,7 +261,6 @@ export default function JobQueueDashboard({
     setPreferencesStatus('Searching jobs with your latest profile...');
     setPreferencesStatusType('info');
     setActiveView('all');
-    setSearchResults([]);
     console.log('Searching with preferences:', searchPreferences);
 
     const searchData = await requestJson('/api/jobs/search', {
@@ -277,7 +278,8 @@ export default function JobQueueDashboard({
     }, authToken, onSessionExpired);
 
     const returnedApplications = normalizeApplications(searchData);
-    setSearchResults(returnedApplications);
+    // IMPORTANT: Only update allJobs. Do NOT touch favorites/applied/interviews.
+    setAllJobs(returnedApplications);
 
     const queued = Number(searchData.queued || searchData.queuedCount || 0);
     const rejected = Number(searchData.rejected || searchData.rejectedCount || 0);
@@ -360,8 +362,13 @@ export default function JobQueueDashboard({
 
         if (isMounted) {
           const storedApplications = normalizeApplications(applicationsData);
-          setSearchResults(storedApplications);
+          
+          // Initialize each state with its respective applications
+          setAllJobs(storedApplications);
           setFavoriteJobs(storedApplications.filter((application) => application.isFavorite));
+          setAppliedJobs(storedApplications.filter((application) => application.status === 'applied'));
+          setInterviewJobs(storedApplications.filter((application) => application.status === 'interview'));
+          
           setPreferences({
             ...DEFAULT_PREFERENCES,
             ...(preferencesData.preferences || {}),
@@ -449,7 +456,10 @@ export default function JobQueueDashboard({
       const updatedApplication = data.application;
 
       if (updatedApplication) {
-        setSearchResults((currentResults) => updateApplicationList(currentResults, updatedApplication));
+        // Update allJobs if job is from current search results
+        setAllJobs((currentJobs) => updateApplicationList(currentJobs, updatedApplication));
+        
+        // Update favoriteJobs
         setFavoriteJobs((currentFavorites) => (
           updatedApplication.isFavorite
             ? mergeApplications(currentFavorites, [updatedApplication])
@@ -490,8 +500,27 @@ export default function JobQueueDashboard({
       const updatedApplication = data.application || data;
 
       if (getApplicationId(updatedApplication)) {
-        setSearchResults((currentResults) => updateApplicationList(currentResults, updatedApplication));
+        // Update allJobs if job is in search results
+        setAllJobs((currentJobs) => updateApplicationList(currentJobs, updatedApplication));
+        
+        // Update favoriteJobs
         setFavoriteJobs((currentFavorites) => updateApplicationList(currentFavorites, updatedApplication));
+        
+        // Update appliedJobs - add if status is 'applied', remove otherwise
+        setAppliedJobs((currentApplied) => {
+          if (selectedStatus === 'applied') {
+            return mergeApplications(currentApplied, [updatedApplication]);
+          }
+          return currentApplied.filter((job) => getApplicationKey(job) !== getApplicationKey(updatedApplication));
+        });
+        
+        // Update interviewJobs - add if status is 'interview', remove otherwise
+        setInterviewJobs((currentInterviews) => {
+          if (selectedStatus === 'interview') {
+            return mergeApplications(currentInterviews, [updatedApplication]);
+          }
+          return currentInterviews.filter((job) => getApplicationKey(job) !== getApplicationKey(updatedApplication));
+        });
       } else {
         await fetchStoredApplications();
       }
@@ -690,28 +719,6 @@ export default function JobQueueDashboard({
           </motion.div>
         </motion.section>
 
-        <div className="dashboard-stats-grid">
-          {dashboardStats.map((stat, index) => {
-            const StatIcon = stat.icon;
-
-            return (
-              <motion.div
-                className={`dashboard-stat dashboard-stat--${stat.tone}`}
-                key={stat.label}
-                initial={{ opacity: 0, y: 18 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.28, delay: 0.05 + index * 0.05 }}
-              >
-                <span>
-                  <StatIcon size={19} />
-                </span>
-                <strong>{stat.value}</strong>
-                <small>{stat.label}</small>
-              </motion.div>
-            );
-          })}
-        </div>
-
         <motion.section
           className="profile-setup"
           id="profile-setup"
@@ -901,8 +908,8 @@ export default function JobQueueDashboard({
             {[
               ['all', 'All Jobs', visibleApplications.length],
               ['favorites', 'Favorites', favoriteApplications.length],
-              ['applied', 'Applied', visibleApplications.filter((application) => application.status === 'applied').length],
-              ['interviews', 'Interviews', visibleApplications.filter((application) => application.status === 'interview').length],
+              ['applied', 'Applied', appliedJobs.length],
+              ['interviews', 'Interviews', interviewJobs.length],
             ].map(([value, label, count]) => (
               <button
                 key={value}
